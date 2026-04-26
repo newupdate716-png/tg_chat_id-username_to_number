@@ -13,7 +13,7 @@ def clean_target(target):
     """আইডি থেকে @ চিহ্ন রিমুভ করার লজিক (যদি থাকে)"""
     if target.startswith('@'):
         potential_id = target[1:]
-        if potential_id.isdigit():
+        if potential_id.isdigit(): # যদি @ এর পরে শুধু সংখ্যা থাকে (যেমন @6462069341)
             return potential_id
     return target
 
@@ -28,7 +28,7 @@ def premium_lookup():
             "message": "Username or Chat ID is required."
         }), 400
 
-    # আইডি ক্লিন করা
+    # আইডি ক্লিন করা (যেমন: @6462069341 -> 6462069341)
     target = clean_target(raw_target)
 
     try:
@@ -51,15 +51,7 @@ def premium_lookup():
         osint_data = osint_res.json() if osint_res.status_code == 200 else {}
         osint_result = osint_data.get("result", {})
 
-        # 🔥 FIX: username handling
-        username_value = tg_data.get("username")
-
-        if username_value and not str(username_value).isdigit():
-            formatted_username = f"@{username_value}"
-        else:
-            formatted_username = "N/A"
-
-        # --- Step 3: Ultra Premium Response ---
+        # --- Step 3: Ultra Premium Response Construction ---
         premium_response = {
             "success": True,
             "developer_credit": "SB-SAKIB",
@@ -67,7 +59,7 @@ def premium_lookup():
             "data": {
                 "profile_summary": {
                     "uid": tg_data.get("id"),
-                    "username": formatted_username,
+                    "username": f"@{tg_data.get('username')}" if tg_data.get("username") else "N/A",
                     "full_name": f"{tg_data.get('first_name', '')} {tg_data.get('last_name', '')}".strip() or "N/A",
                     "bio": tg_data.get("bio", "No bio available"),
                     "is_premium_account": tg_data.get("premium_user", False),
