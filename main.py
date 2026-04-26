@@ -9,105 +9,105 @@ CORS(app)
 TG_INFO_API = "https://tginfo-production-1326.up.railway.app/"
 OSINT_API_BASE = "https://abhigyan-codes-tg-to-number-api.onrender.com/@abhigyan_codes/userid="
 
-def format_target(target):
+def process_input(user_input):
     """
-    লজিক: 
-    - যদি শুধু সংখ্যা হয় (Chat ID), তবে সরাসরি সংখ্যা রিটার্ন করবে।
-    - যদি ইউজারনেম হয় এবং @ না থাকে, তবে @ যোগ করে দিবে।
-    - যদি আইডি'র সাথে ভুল করে @ দেয় (যেমন @6462069341), তবে @ সরিয়ে দিবে।
+    ইনপুট প্রসেসিং লজিক:
+    - যদি ইনপুটটি পুরোপুরি সংখ্যা হয় (Chat ID), তবে কোনো @ ছাড়াই সরাসরি যাবে।
+    - যদি ইনপুটটি সংখ্যা না হয় (Username), তবে অবশ্যই আগে একটি @ যুক্ত হয়ে যাবে।
     """
-    target = target.strip()
+    cleaned = user_input.strip()
     
-    # যদি ইনপুটটি সংখ্যা হয় (Chat ID)
-    if target.isdigit():
-        return target
+    # যদি ইনপুটে @ থাকে এবং তারপর সংখ্যা থাকে (যেমন @6462069341), তবে @ সরিয়ে দিবে
+    if cleaned.startswith('@') and cleaned[1:].isdigit():
+        return cleaned[1:]
     
-    # যদি ইনপুটে @ থাকে এবং তারপর সংখ্যা থাকে (যেমন @6462069341)
-    if target.startswith('@') and target[1:].isdigit():
-        return target[1:]
+    # যদি ইনপুটটি শুধু সংখ্যা হয়
+    if cleaned.isdigit():
+        return cleaned
     
-    # যদি সাধারণ ইউজারনেম হয় কিন্তু @ না থাকে
-    if not target.startswith('@') and not target.isdigit():
-        return f"@{target}"
+    # যদি ইনপুটটি ইউজারনেম হয় (এবং আগে @ না থাকে)
+    if not cleaned.startswith('@'):
+        return f"@{cleaned}"
         
-    return target
+    return cleaned
 
 @app.route('/lookup', methods=['GET'])
 def premium_lookup():
-    user_input = request.args.get('user')
+    raw_input = request.args.get('user')
     
-    if not user_input:
+    if not raw_input:
         return jsonify({
             "success": False,
-            "status": "Missing Parameter",
-            "message": "Please provide a Username or Chat ID."
+            "status": "Error",
+            "message": "Username or ID is required to fetch data."
         }), 400
 
-    # ইনপুট ফরম্যাট ঠিক করা
-    target = format_target(user_input)
+    # প্রসেসড ইনপুট (আইডি হলে শুধু আইডি, ইউজারনেম হলে @সহ)
+    target = process_input(raw_input)
 
     try:
-        # --- Step 1: Telegram Core Info ---
+        # --- Step 1: Telegram Information Fetch ---
         tg_res = requests.get(f"{TG_INFO_API}?user={target}", timeout=15)
         tg_data = tg_res.json()
 
         if not tg_data.get("success"):
             return jsonify({
                 "success": False,
-                "status": "Invalid Entity",
-                "message": "User not found. Please check the ID/Username.",
-                "debug": tg_data
+                "status": "Data Not Found",
+                "message": "Specified user/id does not exist in our database.",
+                "error_log": tg_data
             }), 404
 
-        # মেইন ডাটা এক্সট্রাক্ট করা
         extracted_id = tg_data.get("id")
 
-        # --- Step 2: OSINT Number Lookup ---
+        # --- Step 2: Intelligence & Number Fetch ---
         osint_res = requests.get(f"{OSINT_API_BASE}{extracted_id}", timeout=15)
         osint_data = osint_res.json() if osint_res.status_code == 200 else {}
         osint_result = osint_data.get("result", {})
 
-        # --- Step 3: Ultra Premium JSON Format ---
-        premium_output = {
+        # --- Step 3: Ultra Premium JSON Response Construction ---
+        premium_response = {
             "success": True,
-            "status": "Premium Success",
-            "auth_by": "SB-SAKIB",
-            "account_details": {
+            "meta": {
+                "status": "200_OK",
+                "developer": "SB-SAKIB",
+                "engine": "Premium Hybrid API v3.0"
+            },
+            "profile": {
                 "user_id": tg_data.get("id"),
-                "username": f"@{tg_data.get('username')}" if tg_data.get("username") else "N/A",
-                "display_name": f"{tg_data.get('first_name', '')} {tg_data.get('last_name', '')}".strip() or "N/A",
-                "biography": tg_data.get("bio", "No bio available"),
+                "username": f"@{tg_data.get('username')}" if tg_data.get("username") else None,
+                "first_name": tg_data.get("first_name", "N/A"),
+                "last_name": tg_data.get("last_name", "N/A"),
+                "full_bio": tg_data.get("bio", "No bio provided"),
                 "is_premium": tg_data.get("premium_user", False),
-                "avatar_url": tg_data.get("public_view", {}).get("web_image", "N/A")
+                "profile_image": tg_data.get("public_view", {}).get("web_image")
             },
-            "intel_data": {
-                "linked_number": osint_result.get("number", "Encrypted/Private"),
-                "location_country": osint_result.get("country", "Unknown"),
-                "country_iso": osint_result.get("country_code", "N/A"),
-                "database_source": osint_result.get("api_used", "OpenOSINT"),
-                "lookup_time": osint_result.get("timestamp")
+            "contact_intel": {
+                "phone_number": osint_result.get("number", "Private/N/A"),
+                "country": osint_result.get("country", "Unknown"),
+                "country_code": osint_result.get("country_code", "N/A"),
+                "source": osint_result.get("api_used", "Deep-OSINT"),
+                "timestamp": osint_result.get("timestamp")
             },
-            "security_report": {
+            "security_analysis": {
                 "bot_status": tg_data.get("is_bot", False),
                 "scam_alert": tg_data.get("is_scam", False),
-                "fake_flag": tg_data.get("is_fake", False),
-                "verified_badge": tg_data.get("is_verified", False),
-                "leak_history": tg_data.get("leaked_info", "No leak found")
+                "verified": tg_data.get("is_verified", False),
+                "leak_report": tg_data.get("leaked_info", "Clean")
             },
-            "platform_links": {
-                "profile_link": tg_data.get("public_view", {}).get("telegram_link"),
-                "developer_contact": "https://t.me/sakib01994"
+            "links": {
+                "telegram_url": tg_data.get("public_view", {}).get("telegram_link"),
+                "api_support": "https://t.me/sakib01994"
             }
         }
 
-        return jsonify(premium_output), 200
+        return jsonify(premium_response), 200
 
     except Exception as e:
         return jsonify({
             "success": False,
-            "status": "Server Error",
-            "message": "Failed to process request.",
-            "error_log": str(e)
+            "status": "System Failure",
+            "message": str(e)
         }), 500
 
 if __name__ == '__main__':
