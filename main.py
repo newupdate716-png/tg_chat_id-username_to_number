@@ -10,11 +10,9 @@ TG_INFO_API = "https://tginfo-production-1326.up.railway.app/"
 OSINT_API_BASE = "https://abhigyan-codes-tg-to-number-api.onrender.com/@abhigyan_codes/userid="
 
 def clean_target(target):
-    """আইডি থেকে @ চিহ্ন রিমুভ করার লজিক (যদি থাকে)"""
-    if target.startswith('@'):
-        potential_id = target[1:]
-        if potential_id.isdigit(): # যদি @ এর পরে শুধু সংখ্যা থাকে (যেমন @6462069341)
-            return potential_id
+    """ইউজারনেম বা আইডি থেকে @ চিহ্ন রিমুভ করার লজিক"""
+    if target and target.startswith('@'):
+        return target[1:]  # @ চিহ্নটি বাদ দিয়ে বাকি অংশ রিটার্ন করবে
     return target
 
 @app.route('/lookup', methods=['GET'])
@@ -28,7 +26,7 @@ def premium_lookup():
             "message": "Username or Chat ID is required."
         }), 400
 
-    # আইডি ক্লিন করা (যেমন: @6462069341 -> 6462069341)
+    # ইনপুট ক্লিন করা (যেমন: @sbsakib -> sbsakib অথবা @6462069341 -> 6462069341)
     target = clean_target(raw_target)
 
     try:
