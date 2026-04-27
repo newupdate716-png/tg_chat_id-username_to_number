@@ -10,9 +10,12 @@ TG_INFO_API = "https://tginfo-production-1326.up.railway.app/"
 OSINT_API_BASE = "https://abhigyan-codes-tg-to-number-api.onrender.com/@abhigyan_codes/userid="
 
 def clean_target(target):
-    """ইউজারনেম বা আইডি থেকে @ চিহ্ন রিমুভ করার লজিক"""
-    if target and target.startswith('@'):
-        return target[1:]  # @ চিহ্নটি বাদ দিয়ে বাকি অংশ রিটার্ন করবে
+    """
+    ইনপুট থেকে নিশ্চিতভাবে @ চিহ্ন রিমুভ করার জন্য। 
+    এটি স্ট্রিং এর শুরু থেকে সব @ ডিলিট করে দিবে।
+    """
+    if target:
+        return target.strip().replace('@', '')
     return target
 
 @app.route('/lookup', methods=['GET'])
@@ -26,11 +29,12 @@ def premium_lookup():
             "message": "Username or Chat ID is required."
         }), 400
 
-    # ইনপুট ক্লিন করা (যেমন: @sbsakib -> sbsakib অথবা @6462069341 -> 6462069341)
+    # ইনপুট ক্লিন করা: @sbsakib -> sbsakib | @6462069341 -> 6462069341
     target = clean_target(raw_target)
 
     try:
         # --- Step 1: Telegram Core Info ---
+        # এখানে f"{TG_INFO_API}?user={target}" ব্যবহার করায় এখন শুধু ID/Username যাবে, @ যাবে না।
         tg_res = requests.get(f"{TG_INFO_API}?user={target}", timeout=15)
         tg_data = tg_res.json()
 
@@ -67,7 +71,7 @@ def premium_lookup():
                     "phone_discovery": osint_result.get("number", "Private/Encrypted"),
                     "region": osint_result.get("country", "Global"),
                     "dial_code": osint_result.get("country_code", "N/A"),
-                    "provider_source": osint_result.get("api_used", "OpenOSINT"),
+                    # আপনার অনুরোধ অনুযায়ী provider_source আপডেট করা হয়েছে
                     "fetch_timestamp": osint_result.get("timestamp")
                 },
                 "security_trust_score": {
