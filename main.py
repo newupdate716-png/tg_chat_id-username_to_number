@@ -10,17 +10,16 @@ TG_INFO_API = "https://tginfo-production-1326.up.railway.app/"
 OSINT_API_BASE = "https://abhigyan-codes-tg-to-number-api.onrender.com/@abhigyan_codes/userid="
 
 def clean_target(target):
-    """
-    নিশ্চিতভাবে শুধুমাত্র শুরুর @ চিহ্ন রিমুভ করার লজিক।
-    আইডি বা ইউজারনেম যাই হোক না কেন, এটি ক্লিন করে পাঠাবে।
-    """
     if not target:
         return target
     
     target = str(target).strip()
     if target.startswith('@'):
-        return target[1:] # শুধু প্রথম ক্যারেক্টার (@) বাদ দিবে
+        return target[1:]
     return target
+
+def is_numeric(value):
+    return str(value).isdigit()
 
 @app.route('/lookup', methods=['GET'])
 def premium_lookup():
@@ -33,60 +32,74 @@ def premium_lookup():
             "message": "Username or Chat ID is required."
         }), 400
 
-    # এখানে এখন @6462069341 হয়ে যাবে 6462069341
     target = clean_target(raw_target)
 
     try:
-        # --- Step 1: Telegram Core Info ---
-        tg_res = requests.get(f"{TG_INFO_API}?user={target}", timeout=15)
-        tg_data = tg_res.json()
+        tg_data = {}
+        extracted_id = None
 
-        if not tg_data.get("success"):
-            return jsonify({
-                "success": False,
-                "status": "Not Found",
-                "message": "No data found for this entity.",
-                "api_response": tg_data
-            }), 404
+        # -------------------------
+        # 🔥 CASE 1: যদি Numeric ID হয়
+        # -------------------------
+        if is_numeric(target):
+            extracted_id = target
 
-        extracted_id = tg_data.get("id")
+        # -------------------------
+        # 🔥 CASE 2: যদি Username হয়
+        # -------------------------
+        else:
+            tg_res = requests.get(f"{TG_INFO_API}?user={target}", timeout=15)
+            tg_data = tg_res.json()
 
-        # --- Step 2: OSINT & Number Lookup ---
+            if not tg_data.get("success"):
+                return jsonify({
+                    "success": False,
+                    "status": "Not Found",
+                    "message": "No data found for this entity.",
+                    "api_response": tg_data
+                }), 404
+
+            extracted_id = tg_data.get("id")
+
+        # -------------------------
+        # OSINT CALL (Both case)
+        # -------------------------
         osint_res = requests.get(f"{OSINT_API_BASE}{extracted_id}", timeout=15)
         osint_data = osint_res.json() if osint_res.status_code == 200 else {}
         osint_result = osint_data.get("result", {})
 
-        # --- Step 3: Ultra Premium Response Construction ---
+        # -------------------------
+        # RESPONSE BUILD
+        # -------------------------
         premium_response = {
             "success": True,
             "developer_credit": "SB-SAKIB",
             "execution_status": "Success",
             "data": {
                 "profile_summary": {
-                    "uid": tg_data.get("id"),
+                    "uid": extracted_id,
                     "username": f"@{tg_data.get('username')}" if tg_data.get("username") else "N/A",
                     "full_name": f"{tg_data.get('first_name', '')} {tg_data.get('last_name', '')}".strip() or "N/A",
-                    "bio": tg_data.get("bio", "No bio available"),
-                    "is_premium_account": tg_data.get("premium_user", False),
-                    "profile_picture": tg_data.get("public_view", {}).get("web_image", "No Image")
+                    "bio": tg_data.get("bio", "No bio available") if tg_data else "Not Available (ID Mode)",
+                    "is_premium_account": tg_data.get("premium_user", False) if tg_data else False,
+                    "profile_picture": tg_data.get("public_view", {}).get("web_image", "No Image") if tg_data else "No Image"
                 },
                 "contact_intelligence": {
                     "phone_discovery": osint_result.get("number", "Private/Encrypted"),
                     "region": osint_result.get("country", "Global"),
                     "dial_code": osint_result.get("country_code", "N/A"),
-                    # provider_source রিমুভ করা হয়েছে
                     "fetch_timestamp": osint_result.get("timestamp")
                 },
                 "security_trust_score": {
-                    "is_bot": tg_data.get("is_bot", False),
-                    "is_scam": tg_data.get("is_scam", False),
-                    "is_fake": tg_data.get("is_fake", False),
-                    "is_verified": tg_data.get("is_verified", False),
-                    "data_leak_status": tg_data.get("leaked_info", "Clean")
+                    "is_bot": tg_data.get("is_bot", False) if tg_data else False,
+                    "is_scam": tg_data.get("is_scam", False) if tg_data else False,
+                    "is_fake": tg_data.get("is_fake", False) if tg_data else False,
+                    "is_verified": tg_data.get("is_verified", False) if tg_data else False,
+                    "data_leak_status": tg_data.get("leaked_info", "Unknown") if tg_data else "Unknown"
                 }
             },
             "system_links": {
-                "direct_telegram": tg_data.get("public_view", {}).get("telegram_link"),
+                "direct_telegram": tg_data.get("public_view", {}).get("telegram_link") if tg_data else None,
                 "support_dev": "https://t.me/sakib01994"
             }
         }
@@ -100,6 +113,7 @@ def premium_lookup():
             "message": "An unexpected error occurred during processing.",
             "debug": str(e)
         }), 500
+
 
 if __name__ == '__main__':
     app.run(debug=False)
