@@ -5,9 +5,11 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# API Endpoints
+# OLD API (username -> id)
 TG_INFO_API = "https://tginfo-production-1326.up.railway.app/"
-OSINT_API_BASE = "https://abhigyan-codes-tg-to-number-api.onrender.com/@abhigyan_codes/userid="
+
+# NEW API (id ভিত্তিক)
+NEW_API = "https://num-tg-info-api.vercel.app/?id="
 
 def clean_target(target):
     if not target:
@@ -39,13 +41,13 @@ def premium_lookup():
         extracted_id = None
 
         # -------------------------
-        # 🔥 CASE 1: যদি Numeric ID হয়
+        # ✅ CASE 1: Numeric ID
         # -------------------------
         if is_numeric(target):
             extracted_id = target
 
         # -------------------------
-        # 🔥 CASE 2: যদি Username হয়
+        # ✅ CASE 2: Username → ID
         # -------------------------
         else:
             tg_res = requests.get(f"{TG_INFO_API}?user={target}", timeout=15)
@@ -62,14 +64,19 @@ def premium_lookup():
             extracted_id = tg_data.get("id")
 
         # -------------------------
-        # OSINT CALL (Both case)
+        # ✅ NEW API CALL
         # -------------------------
-        osint_res = requests.get(f"{OSINT_API_BASE}{extracted_id}", timeout=15)
-        osint_data = osint_res.json() if osint_res.status_code == 200 else {}
-        osint_result = osint_data.get("result", {})
+        new_res = requests.get(f"{NEW_API}{extracted_id}", timeout=15)
+        new_data = new_res.json() if new_res.status_code == 200 else {}
+
+        result = new_data.get("RESULT", {})
+        basic = result.get("BASIC_INFO", {})
+        status = result.get("STATUS_INFO", {})
+        activity = result.get("ACTIVITY_INFO", {})
+        number = result.get("NUMBER_INFO", {})
 
         # -------------------------
-        # RESPONSE BUILD
+        # ✅ FINAL PREMIUM RESPONSE
         # -------------------------
         premium_response = {
             "success": True,
@@ -77,23 +84,32 @@ def premium_lookup():
             "execution_status": "Success",
             "data": {
                 "profile_summary": {
-                    "uid": extracted_id,
+                    "uid": basic.get("ID", extracted_id),
                     "username": f"@{tg_data.get('username')}" if tg_data.get("username") else "N/A",
-                    "full_name": f"{tg_data.get('first_name', '')} {tg_data.get('last_name', '')}".strip() or "N/A",
-                    "bio": tg_data.get("bio", "No bio available") if tg_data else "Not Available (ID Mode)",
-                    "is_premium_account": tg_data.get("premium_user", False) if tg_data else False,
-                    "profile_picture": tg_data.get("public_view", {}).get("web_image", "No Image") if tg_data else "No Image"
+                    "full_name": f"{basic.get('FIRST_NAME', '')} {basic.get('LAST_NAME') or ''}".strip() or "N/A",
+                    "total_usernames": basic.get("USERNAMES_COUNT"),
+                    "name_history": basic.get("NAMES_COUNT"),
+                },
+                "account_status": {
+                    "is_bot": status.get("IS_BOT", False),
+                    "is_active": status.get("IS_ACTIVE", False),
+                },
+                "activity_intelligence": {
+                    "first_seen": activity.get("FIRST_MSG_DATE"),
+                    "last_seen": activity.get("LAST_MSG_DATE"),
+                    "total_messages": activity.get("TOTAL_MSG_COUNT"),
+                    "group_messages": activity.get("MSG_IN_GROUPS_COUNT"),
+                    "admin_in_groups": activity.get("ADM_IN_GROUPS"),
+                    "total_groups": activity.get("TOTAL_GROUPS"),
                 },
                 "contact_intelligence": {
-                    "phone_discovery": osint_result.get("number", "Private/Encrypted"),
-                    "region": osint_result.get("country", "Global"),
-                    "dial_code": osint_result.get("country_code", "N/A"),
-                    "fetch_timestamp": osint_result.get("timestamp")
+                    "phone_number": number.get("NUMBER", "Private"),
+                    "country": number.get("COUNTRY"),
+                    "country_code": number.get("COUNTRY_CODE"),
                 },
                 "security_trust_score": {
-                    "is_bot": tg_data.get("is_bot", False) if tg_data else False,
-                    "is_scam": tg_data.get("is_scam", False) if tg_data else False,
                     "is_fake": tg_data.get("is_fake", False) if tg_data else False,
+                    "is_scam": tg_data.get("is_scam", False) if tg_data else False,
                     "is_verified": tg_data.get("is_verified", False) if tg_data else False,
                     "data_leak_status": tg_data.get("leaked_info", "Unknown") if tg_data else "Unknown"
                 }
@@ -110,7 +126,7 @@ def premium_lookup():
         return jsonify({
             "success": False,
             "status": "Internal Error",
-            "message": "An unexpected error occurred during processing.",
+            "message": "An unexpected error occurred.",
             "debug": str(e)
         }), 500
 
