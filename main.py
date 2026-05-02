@@ -7,7 +7,7 @@ CORS(app)
 
 # APIs
 TG_INFO_API = "https://tginfo-production-1326.up.railway.app/"
-NEW_API = "https://num-tg-info-api.vercel.app/?id="
+NEW_API = "https://hejdu3838.serv00.net/API/tg.php?id="
 
 def clean_target(target):
     if not target:
