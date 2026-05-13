@@ -23,7 +23,7 @@ def is_numeric(value):
 
 @app.route('/lookup', methods=['GET'])
 def premium_lookup():
-    raw_target = request.args.get('user')
+    raw_target = request.args.get('username&id')
     
     if not raw_target:
         return jsonify({
